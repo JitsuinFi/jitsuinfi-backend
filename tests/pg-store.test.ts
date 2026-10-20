@@ -6,8 +6,13 @@ import { PostgresStore } from "../src/pg-store.ts";
 import { fullScenario } from "./flow.ts";
 
 const url = process.env.TEST_DATABASE_URL;
+const skip = !url
+  ? "TEST_DATABASE_URL is not set"
+  : !/^postgres(ql)?:\/\//.test(url)
+    ? "TEST_DATABASE_URL is not a postgres:// connection string (a Supabase project https URL is not one)"
+    : false;
 
-test("relay scenario against Postgres", { skip: url ? false : "TEST_DATABASE_URL is not set" }, async () => {
+test("relay scenario against Postgres", { skip }, async () => {
   const store = new PostgresStore(url as string);
   try {
     const { alice, bob } = await fullScenario(store);

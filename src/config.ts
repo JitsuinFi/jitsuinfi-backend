@@ -25,10 +25,16 @@ function int(name: string, fallback: number, min: number): number {
   return n;
 }
 
+function postgresUrl(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  if (!/^postgres(ql)?:\/\//.test(v)) throw new Error("DATABASE_URL must be a postgres:// connection string (Supabase: Connect > Session pooler)");
+  return v;
+}
+
 export function loadConfig(): Config {
   return {
     port: int("PORT", 8787, 1),
-    databaseUrl: process.env.DATABASE_URL || undefined,
+    databaseUrl: postgresUrl(process.env.DATABASE_URL),
     retentionDays: int("RETENTION_DAYS", 30, 1),
     maxMessagesPerMailbox: int("MAX_MESSAGES_PER_MAILBOX", 200, 1),
     challengeTtlSeconds: int("CHALLENGE_TTL_SECONDS", 120, 10),
