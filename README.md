@@ -37,4 +37,16 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 
 `npm test` runs the API against an in-memory store, and against Postgres when `TEST_DATABASE_URL` is set. `npm run typecheck` checks the types.
 
+## Deploy on Railway (HNK-23.T5, after approval)
+
+`railway.json` builds with Railpack on Node 24 (`.node-version`), runs `npm run migrate` before each deploy (idempotent), starts with `npm start` and checks `/api/health`.
+
+1. Railway: New project → Deploy from GitHub repo → `JitsuinFi/jitsuinfi-backend` (give the Railway GitHub app access to this private repo), branch `main`.
+2. Variables: `DATABASE_URL` = the Supabase **Session pooler** URI (below). `PORT` is set by Railway. Optional: `RETENTION_DAYS`, `MAX_MESSAGES_PER_MAILBOX`, `CHALLENGE_TTL_SECONDS`, `READ_TOKEN_TTL_SECONDS`.
+3. Networking → Generate domain. The web app reaches it through a Vercel rewrite of `/api/*` (HNK-23.T6), never directly.
+
+`DATABASE_URL` from Supabase: Connect → Connection string → URI → Method **Session pooler**:
+`postgresql://postgres.<project-ref>:<database-password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+Session pooler, because the direct connection is IPv6 only and Railway connects over IPv4; port 5432 (session mode), because `postgres` uses prepared statements. The password is the database password (Project Settings → Database), not an API key. No Supabase API keys (anon, publishable, secret, service role) are used: the relay talks to Postgres only, and the browser never talks to Supabase (D-33).
+
 Status: in development for ZECATHON 2026, on Zcash testnet.
