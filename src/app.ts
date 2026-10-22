@@ -8,6 +8,8 @@
 //   GET    /api/mailbox/:id/messages            Bearer token → [{id, size, received_at}]
 //   GET    /api/mailbox/:id/messages/:mid       Bearer token → sealed box
 //   DELETE /api/mailbox/:id/messages/:mid       Bearer token → removed after reading
+//   PUT    /api/mailbox/:id/state               Bearer token, sealed box → the owner's state replaced
+//   GET    /api/mailbox/:id/state               Bearer token → the owner's sealed state
 //
 // Anyone who knows a mailbox_id can drop a message in it (that is how parties reach each other);
 // only the mailbox owner can list or fetch. Messages are opaque here: their meaning and their
@@ -15,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { MAX_CIPHERTEXT, SEAL_OVERHEAD, type Config } from "./config.ts";
+import { MAX_CIPHERTEXT, MAX_STATE, SEAL_OVERHEAD, type Config } from "./config.ts";
 import { BadRequest, ephemeral, fromHex, mailboxId, proofTag, randomBytes, randomToken, sameBytes, tokenHash, x25519, type Purpose } from "./crypto.ts";
 import type { Store } from "./store.ts";
 
@@ -164,6 +166,32 @@ export function createApp(store: Store, cfg: Config, now: () => Date = () => new
     const id = await authorized(c);
     if (!(await store.deleteMessage(id, messageParam(c)))) throw new HttpError(404, "no such message (removed or expired)");
     return c.body(null, 204);
+  });
+
+  // HNK-25.T2 (BL-D26-03): one sealed state per mailbox that only its owner writes and reads, so a
+  // buyer's history chain follows its passkey to another device. The relay cannot read it; it can
+  // only withhold or roll it back, which the browser detects against its own copy and the board.
+  app.put(
+    "/api/mailbox/:id/state",
+    bodyLimit({ maxSize: MAX_STATE, onError: (c) => c.json({ error: `the state is at most ${MAX_STATE} bytes sealed` }, 413) }),
+    async (c) => {
+      const id = await authorized(c);
+      if ((c.req.header("Content-Type") ?? "").split(";")[0].trim() !== "application/octet-stream") {
+        throw new BadRequest("send the sealed state as application/octet-stream");
+      }
+      const ciphertext = Buffer.from(await c.req.arrayBuffer());
+      if (ciphertext.length <= SEAL_OVERHEAD) throw new BadRequest("this is not a sealed state");
+      const t = now();
+      await store.putState(id, ciphertext, t);
+      return c.json({ updated_at: iso(t) });
+    },
+  );
+
+  app.get("/api/mailbox/:id/state", async (c) => {
+    const id = await authorized(c);
+    const s = await store.getState(id);
+    if (!s) throw new HttpError(404, "this mailbox has no saved state");
+    return c.body(new Uint8Array(s.ciphertext), 200, { "Content-Type": "application/octet-stream", "Last-Modified": s.updatedAt.toUTCString() });
   });
 
   return app;

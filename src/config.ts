@@ -7,6 +7,9 @@ export const MAX_PLAINTEXT = 9 + 64 * 1024 + 2 * 2 * 1024 * 1024;
 /** Sealed box overhead: ephemeral X25519 key (32) and Poly1305 tag (16). */
 export const SEAL_OVERHEAD = 48;
 export const MAX_CIPHERTEXT = MAX_PLAINTEXT + SEAL_OVERHEAD;
+/** Largest mailbox state (HNK-25.T2): the owner's own sealed backup, such as a buyer's history
+ *  chain (64 certificates of 277 bytes in base64url JSON fit with room to spare). */
+export const MAX_STATE = 64 * 1024 + SEAL_OVERHEAD;
 
 export interface Config {
   port: number;

@@ -34,6 +34,9 @@ export interface Store {
   listMessages(mailboxId: string, now: Date): Promise<MessageMeta[]>;
   getMessage(mailboxId: string, id: string, now: Date): Promise<Buffer | undefined>;
   deleteMessage(mailboxId: string, id: string): Promise<boolean>;
+  /** The owner's sealed state, one per mailbox, replaced on each write and never expired. */
+  putState(mailboxId: string, ciphertext: Buffer, updatedAt: Date): Promise<void>;
+  getState(mailboxId: string): Promise<{ ciphertext: Buffer; updatedAt: Date } | undefined>;
   /** Drops expired messages, challenges and tokens; returns how many messages went. */
   purge(now: Date): Promise<number>;
   close(): Promise<void>;
@@ -45,6 +48,7 @@ export class MemoryStore implements Store {
   private challenges = new Map<string, Challenge>();
   private tokens = new Map<string, { mailboxId: string; expiresAt: Date }>();
   private messages = new Map<string, Map<string, { ciphertext: Buffer; meta: MessageMeta }>>();
+  private states = new Map<string, { ciphertext: Buffer; updatedAt: Date }>();
 
   async addMailbox(id: string, pk: Buffer): Promise<boolean> {
     if (this.mailboxes.has(id)) return false;
@@ -88,6 +92,12 @@ export class MemoryStore implements Store {
   }
   async deleteMessage(mailboxId: string, id: string): Promise<boolean> {
     return this.messages.get(mailboxId)?.delete(id) ?? false;
+  }
+  async putState(mailboxId: string, ciphertext: Buffer, updatedAt: Date): Promise<void> {
+    this.states.set(mailboxId, { ciphertext: Buffer.from(ciphertext), updatedAt });
+  }
+  async getState(mailboxId: string): Promise<{ ciphertext: Buffer; updatedAt: Date } | undefined> {
+    return this.states.get(mailboxId);
   }
   async purge(now: Date): Promise<number> {
     let n = 0;

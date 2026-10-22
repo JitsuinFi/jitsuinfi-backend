@@ -79,6 +79,19 @@ export async function fullScenario(store: Store) {
   assert.equal((await h.call("DELETE", `/api/mailbox/${alice.id}/messages/${message_id}`, undefined, auth)).status, 204);
   assert.equal((await h.call("GET", `/api/mailbox/${alice.id}/messages/${message_id}`, undefined, auth)).status, 404);
 
+  // HNK-25.T2: the owner's sealed state, replaced on write, only for the owner, kept past retention
+  const st = `/api/mailbox/${alice.id}/state`;
+  assert.equal((await h.call("GET", st, undefined, auth)).status, 404);
+  assert.equal((await h.call("PUT", st, sealed)).status, 401);
+  assert.equal((await h.call("PUT", st, sealed, { Authorization: `Bearer ${bobToken}` })).status, 401);
+  assert.equal((await h.call("PUT", st, new Uint8Array(48), auth)).status, 400);
+  assert.equal((await h.call("PUT", st, new Uint8Array(64 * 1024 + 49), auth)).status, 413);
+  assert.equal((await h.call("PUT", st, sealed, auth)).status, 200);
+  const newer = new Uint8Array(300).fill(7);
+  assert.equal((await h.call("PUT", st, newer, auth)).status, 200);
+  assert.equal((await h.call("GET", st, undefined, { Authorization: `Bearer ${bobToken}` })).status, 401);
+  assert.deepEqual(new Uint8Array(await (await h.call("GET", st, undefined, auth)).arrayBuffer()), newer);
+
   // retention: a message left unread expires
   await h.call("POST", `/api/mailbox/${bob.id}/messages`, sealed);
   h.clock.advance(31 * 86_400);
@@ -86,5 +99,7 @@ export async function fullScenario(store: Store) {
   r = await h.call("GET", `/api/mailbox/${bob.id}/messages`, undefined, { Authorization: `Bearer ${fresh}` });
   assert.deepEqual(((await r.json()) as { messages: unknown[] }).messages, []);
   assert.ok((await store.purge(h.clock.now())) >= 1);
+  const later = await h.token(alice);
+  assert.deepEqual(new Uint8Array(await (await h.call("GET", st, undefined, { Authorization: `Bearer ${later}` })).arrayBuffer()), newer);
   return { alice, bob };
 }

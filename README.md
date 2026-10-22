@@ -21,8 +21,12 @@ The browser reaches it as `/api/*` on the web app's own origin (Vercel rewrite, 
 | GET | `/api/mailbox/:id/messages` | `Authorization: Bearer <token>` | `{messages: [{id, size, received_at, expires_at}]}` |
 | GET | `/api/mailbox/:id/messages/:mid` | Bearer | the sealed box |
 | DELETE | `/api/mailbox/:id/messages/:mid` | Bearer | `204` |
+| PUT | `/api/mailbox/:id/state` | Bearer, sealed box (`application/octet-stream`, at most 64 KiB + 48) | `{updated_at}`; replaces the owner's state |
+| GET | `/api/mailbox/:id/state` | Bearer | the owner's sealed state, or `404` when none was saved |
 
 Messages expire after `RETENTION_DAYS` (30); a mailbox holds at most `MAX_MESSAGES_PER_MAILBOX` (200) unread messages. Errors are `{error}` with a readable sentence.
+
+The **state** (HNK-25.T2) is one sealed blob per mailbox that only its owner writes and reads, kept until the owner replaces it: the buyer's history chain, sealed in the browser to the buyer's own mailbox key, so a second device signed in with the same passkey gets it back. The relay sees its size and time only. It cannot forge a chain (every certificate is signed by the buyer's identity key and links the previous one); it can only withhold or roll it back, which the browser detects against its own copy and the next certificate's tag on the board.
 
 ## Run
 

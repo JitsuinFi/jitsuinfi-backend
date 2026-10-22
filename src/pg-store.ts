@@ -1,4 +1,4 @@
-// Postgres store (Supabase Postgres behind the relay, D-33). Tables: db/001_relay.sql.
+// Postgres store (Supabase Postgres behind the relay, D-33). Tables: db/001_relay.sql, db/002_state.sql.
 import postgres from "postgres";
 import type { Challenge, MessageMeta, Store } from "./store.ts";
 
@@ -52,6 +52,14 @@ export class PostgresStore implements Store {
   }
   async deleteMessage(mailboxId: string, id: string): Promise<boolean> {
     return (await this.sql`delete from relay_messages where mailbox_id = ${mailboxId} and id = ${id} returning id`).length === 1;
+  }
+  async putState(mailboxId: string, ciphertext: Buffer, updatedAt: Date): Promise<void> {
+    await this.sql`insert into relay_state (mailbox_id, ciphertext, size, updated_at) values (${mailboxId}, ${ciphertext}, ${ciphertext.length}, ${updatedAt})
+      on conflict (mailbox_id) do update set ciphertext = excluded.ciphertext, size = excluded.size, updated_at = excluded.updated_at`;
+  }
+  async getState(mailboxId: string): Promise<{ ciphertext: Buffer; updatedAt: Date } | undefined> {
+    const [r] = await this.sql`select ciphertext, updated_at from relay_state where mailbox_id = ${mailboxId}`;
+    return r ? { ciphertext: r.ciphertext, updatedAt: r.updated_at } : undefined;
   }
   async purge(now: Date): Promise<number> {
     const r = await this.sql`delete from relay_messages where expires_at <= ${now} returning id`;
