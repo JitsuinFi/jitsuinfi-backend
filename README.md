@@ -54,3 +54,7 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 Session pooler, because the direct connection is IPv6 only and Railway connects over IPv4; port 5432 (session mode), because `postgres` uses prepared statements. The password is the database password (Project Settings → Database), not an API key. No Supabase API keys (anon, publishable, secret, service role) are used: the relay talks to Postgres only, and the browser never talks to Supabase (D-33).
 
 Status: in development for ZECATHON 2026, on Zcash testnet.
+
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT), at your option. Unless you explicitly state otherwise, any contribution you submit for inclusion in this work, as defined in the Apache-2.0 license, is dual licensed as above, without any additional terms or conditions.
