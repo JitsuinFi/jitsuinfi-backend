@@ -8,6 +8,13 @@ import { MemoryStore, type Store } from "./store.ts";
 const cfg = loadConfig();
 const store: Store = cfg.databaseUrl ? new PostgresStore(cfg.databaseUrl) : new MemoryStore();
 const app = createApp(store, cfg);
+try {
+  await store.ready?.();
+} catch (e) {
+  // without its tables the relay would answer 500 to the endpoints that need them: do not start
+  console.error("relay: the database is not ready:", e instanceof Error ? e.message : e);
+  process.exit(1);
+}
 
 const purge = setInterval(() => {
   store.purge(new Date()).then(

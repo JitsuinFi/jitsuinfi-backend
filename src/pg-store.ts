@@ -1,5 +1,6 @@
 // Postgres store (Supabase Postgres behind the relay, D-33). Tables: db/001_relay.sql, db/002_state.sql.
 import postgres from "postgres";
+import { applyMigrations } from "./schema.ts";
 import type { Challenge, MessageMeta, Store } from "./store.ts";
 
 export class PostgresStore implements Store {
@@ -7,6 +8,11 @@ export class PostgresStore implements Store {
 
   constructor(url: string) {
     this.sql = postgres(url, { max: 5, idle_timeout: 30, ssl: url.includes("localhost") ? false : "require", onnotice: () => {} });
+  }
+
+  /** Applies the idempotent db/*.sql, so a missing table (such as relay_state) cannot reach a request. */
+  async ready(): Promise<void> {
+    await applyMigrations((text) => this.sql.unsafe(text));
   }
 
   async addMailbox(id: string, pk: Buffer): Promise<boolean> {
