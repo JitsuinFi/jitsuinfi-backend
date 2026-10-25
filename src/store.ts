@@ -39,6 +39,8 @@ export interface Store {
   getState(mailboxId: string): Promise<{ ciphertext: Buffer; updatedAt: Date } | undefined>;
   /** Drops expired messages, challenges and tokens; returns how many messages went. */
   purge(now: Date): Promise<number>;
+  /** Makes sure the store can serve every endpoint (Postgres: its tables exist); run before listening. */
+  ready?(): Promise<void>;
   close(): Promise<void>;
 }
 

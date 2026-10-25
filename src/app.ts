@@ -31,6 +31,9 @@ class HttpError extends Error {
 
 const iso = (d: Date) => d.toISOString();
 
+/** Postgres "undefined_table" (42P01): the schema is behind this code (a migration did not run). */
+const missingTable = (err: Error): boolean => (err as { code?: unknown }).code === "42P01";
+
 export function createApp(store: Store, cfg: Config, now: () => Date = () => new Date()): Hono {
   const app = new Hono();
 
@@ -45,6 +48,10 @@ export function createApp(store: Store, cfg: Config, now: () => Date = () => new
     if (err instanceof BadRequest) return c.json({ error: err.message }, 400);
     if (err instanceof HttpError) return c.json({ error: err.message }, err.status);
     if (err instanceof SyntaxError) return c.json({ error: "the request body is not valid JSON" }, 400);
+    if (missingTable(err)) {
+      console.error("relay error:", err.message, "(run npm run migrate)");
+      return c.json({ error: "the relay's database is not set up for this request yet; try again later" }, 503);
+    }
     console.error("relay error:", err instanceof Error ? err.message : err);
     return c.json({ error: "the relay could not handle this request" }, 500);
   });

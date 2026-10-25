@@ -43,7 +43,7 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 
 ## Deploy on Railway (HNK-23.T5, after approval)
 
-`railway.json` builds with Railpack on Node 24 (`.node-version`), runs `npm run migrate` before each deploy (idempotent), starts with `npm start` and checks `/api/health`.
+`railway.json` builds with Railpack on Node 24 (`.node-version`), runs `npm run migrate` before each deploy (idempotent), starts with `npm start` and checks `/api/health`. The relay also applies the same `db/*.sql` when it starts on Postgres and refuses to start if it cannot, so a deploy whose pre-deploy step did not run never serves an older schema (a missing table would otherwise answer 503).
 
 1. Railway: New project → Deploy from GitHub repo → `JitsuinFi/jitsuinfi-backend` (give the Railway GitHub app access to this private repo), branch `main`.
 2. Variables: `DATABASE_URL` = the Supabase **Session pooler** URI (below). `PORT` is set by Railway. Optional: `RETENTION_DAYS`, `MAX_MESSAGES_PER_MAILBOX`, `CHALLENGE_TTL_SECONDS`, `READ_TOKEN_TTL_SECONDS`.
