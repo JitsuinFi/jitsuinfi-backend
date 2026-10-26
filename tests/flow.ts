@@ -81,7 +81,7 @@ export async function fullScenario(store: Store) {
 
   // HNK-25.T2: the owner's sealed state, replaced on write, only for the owner, kept past retention
   const st = `/api/mailbox/${alice.id}/state`;
-  assert.equal((await h.call("GET", st, undefined, auth)).status, 404);
+  assert.equal((await h.call("GET", st, undefined, auth)).status, 204); // nothing saved yet
   assert.equal((await h.call("PUT", st, sealed)).status, 401);
   assert.equal((await h.call("PUT", st, sealed, { Authorization: `Bearer ${bobToken}` })).status, 401);
   assert.equal((await h.call("PUT", st, new Uint8Array(48), auth)).status, 400);
