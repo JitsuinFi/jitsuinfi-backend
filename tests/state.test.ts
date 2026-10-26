@@ -1,6 +1,6 @@
 // HNK-34 E2E (finding 3): a first-time buyer's "Show my next invoice key" reads the history copy
-// at GET /api/mailbox/:id/state. With nothing saved that is a plain 404 the browser takes as "no
-// copy yet"; production answered 500 because its relay_state table was never created. The relay
+// at GET /api/mailbox/:id/state. With nothing saved the relay answers 204 (no body), which the
+// browser takes as "no copy yet" without logging a failed request; production answered 500 because its relay_state table was never created. The relay
 // now applies db/*.sql on start and names a missing table as such (503), never a bare 500.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,13 +9,13 @@ import { applyMigrations, migrationFiles, MIGRATIONS } from "../src/schema.ts";
 import { MemoryStore } from "../src/store.ts";
 import { client, harness } from "./flow.ts";
 
-test("a new mailbox has no saved state yet: 404, not an error", async () => {
+test("a new mailbox has no saved state yet: 204 with no body, not an error", async () => {
   const h = harness(new MemoryStore());
   const a = client();
   assert.equal((await h.register(a)).status, 201);
   const r = await h.call("GET", `/api/mailbox/${a.id}/state`, undefined, { Authorization: `Bearer ${await h.token(a)}` });
-  assert.equal(r.status, 404);
-  assert.deepEqual(await r.json(), { error: "this mailbox has no saved state" });
+  assert.equal(r.status, 204);
+  assert.equal(await r.text(), "");
 });
 
 test("a missing table answers 503 with a sentence, not 500", async () => {

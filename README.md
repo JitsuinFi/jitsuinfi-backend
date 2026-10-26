@@ -22,7 +22,7 @@ The browser reaches it as `/api/*` on the web app's own origin (Vercel rewrite, 
 | GET | `/api/mailbox/:id/messages/:mid` | Bearer | the sealed box |
 | DELETE | `/api/mailbox/:id/messages/:mid` | Bearer | `204` |
 | PUT | `/api/mailbox/:id/state` | Bearer, sealed box (`application/octet-stream`, at most 64 KiB + 48) | `{updated_at}`; replaces the owner's state |
-| GET | `/api/mailbox/:id/state` | Bearer | the owner's sealed state, or `404` when none was saved |
+| GET | `/api/mailbox/:id/state` | Bearer | the owner's sealed state, or `204` (no body) when none was saved |
 
 Messages expire after `RETENTION_DAYS` (30); a mailbox holds at most `MAX_MESSAGES_PER_MAILBOX` (200) unread messages. Errors are `{error}` with a readable sentence.
 

@@ -9,7 +9,7 @@
 //   GET    /api/mailbox/:id/messages/:mid       Bearer token → sealed box
 //   DELETE /api/mailbox/:id/messages/:mid       Bearer token → removed after reading
 //   PUT    /api/mailbox/:id/state               Bearer token, sealed box → the owner's state replaced
-//   GET    /api/mailbox/:id/state               Bearer token → the owner's sealed state
+//   GET    /api/mailbox/:id/state               Bearer token → the owner's sealed state; 204 when none is saved
 //
 // Anyone who knows a mailbox_id can drop a message in it (that is how parties reach each other);
 // only the mailbox owner can list or fetch. Messages are opaque here: their meaning and their
@@ -197,7 +197,8 @@ export function createApp(store: Store, cfg: Config, now: () => Date = () => new
   app.get("/api/mailbox/:id/state", async (c) => {
     const id = await authorized(c);
     const s = await store.getState(id);
-    if (!s) throw new HttpError(404, "this mailbox has no saved state");
+    // Nothing saved yet is a normal answer, not an error: 204 keeps a first-time buyer's console clean.
+    if (!s) return c.body(null, 204);
     return c.body(new Uint8Array(s.ciphertext), 200, { "Content-Type": "application/octet-stream", "Last-Modified": s.updatedAt.toUTCString() });
   });
 
