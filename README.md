@@ -1,6 +1,6 @@
 # jitsuinfi-backend
 
-Relay for **JitsuinFi**: encrypted mailboxes that carry deal documents between supplier, buyer and financier (HNK-23, vault D-33). The relay stores only what it must: each mailbox's X25519 key and id, opaque sealed messages with their size and times, one-time challenges and short read tokens. It never sees a document, a key or an IP address in its tables.
+Relay for **JitsuinFi**: encrypted mailboxes that carry deal documents between supplier, buyer and financier (HNK-23). The relay stores only what it must: each mailbox's X25519 key and id, opaque sealed messages with their size and times, one-time challenges and short read tokens. It never sees a document, a key or an IP address in its tables.
 
 The browser reaches it as `/api/*` on the web app's own origin (Vercel rewrite, HNK-23.T6), so the app's CSP stays `connect-src 'self'`. The database is Supabase Postgres, reached only from this server (D-33).
 
@@ -26,7 +26,7 @@ The browser reaches it as `/api/*` on the web app's own origin (Vercel rewrite, 
 
 Messages expire after `RETENTION_DAYS` (30); a mailbox holds at most `MAX_MESSAGES_PER_MAILBOX` (200) unread messages. Errors are `{error}` with a readable sentence.
 
-The **state** (HNK-25.T2) is one sealed blob per mailbox that only its owner writes and reads, kept until the owner replaces it: the buyer's history chain, sealed in the browser to the buyer's own mailbox key, so a second device signed in with the same passkey gets it back. The relay sees its size and time only. It cannot forge a chain (every certificate is signed by the buyer's identity key and links the previous one); it can only withhold or roll it back, which the browser detects against its own copy and the next certificate's tag on the board.
+The **state** (HNK-25.T2) is one sealed blob per mailbox that only its owner writes and reads, kept until the owner replaces it, so a second device signed in with the same passkey gets the account's records back. The web app writes each role's records there (invoices, deals, keys handed out, contacts and the buyer's history chain; jitsuinfi-frontend `src/lib/sync.ts`): AES-GCM under a key from the passkey, inside a seal to the owner's own mailbox key. The relay sees its size and time only, and `GET` answers `204` while nothing is saved. It cannot read, forge or edit a record; it can only withhold or roll the state back, and the buyer's history chain is checked against the browser's own copy and the next certificate's tag on the board.
 
 ## Run
 
@@ -45,7 +45,7 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 
 `railway.json` builds with Railpack on Node 24 (`.node-version`), runs `npm run migrate` before each deploy (idempotent), starts with `npm start` and checks `/api/health`. The relay also applies the same `db/*.sql` when it starts on Postgres and refuses to start if it cannot, so a deploy whose pre-deploy step did not run never serves an older schema (a missing table would otherwise answer 503).
 
-1. Railway: New project → Deploy from GitHub repo → `JitsuinFi/jitsuinfi-backend` (give the Railway GitHub app access to this private repo), branch `main`.
+1. Railway: New project → Deploy from GitHub repo → `JitsuinFi/jitsuinfi-backend`, branch `main`.
 2. Variables: `DATABASE_URL` = the Supabase **Session pooler** URI (below). `PORT` is set by Railway. Optional: `RETENTION_DAYS`, `MAX_MESSAGES_PER_MAILBOX`, `CHALLENGE_TTL_SECONDS`, `READ_TOKEN_TTL_SECONDS`.
 3. Networking → Generate domain. The web app reaches it through a Vercel rewrite of `/api/*` (HNK-23.T6), never directly.
 
