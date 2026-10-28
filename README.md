@@ -66,6 +66,75 @@ sequenceDiagram
     R-->>O: sealed boxes, opened only in the owner's browser or node
 ```
 
+## Flow in this repo (relay)
+
+**Sequence: one sealed letter from supplier to buyer**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Supplier page
+    participant V as Vercel /api rewrite
+    participant R as Relay (Node)
+    participant DB as Postgres
+    participant B as Buyer page
+    S->>V: POST /api/mailbox/:buyer/messages (sealed box)
+    V->>R: same request, same origin for the app
+    R->>DB: insert relay_messages (ciphertext, size, times)
+    R-->>S: 202 message_id, expires_at
+    B->>R: POST /api/mailbox/challenge (purpose read)
+    R->>DB: insert relay_challenges (eph key, nonce, 120 s)
+    R-->>B: eph_pk, nonce
+    B->>R: POST /api/mailbox/:id/read (proof)
+    R->>DB: check and burn the challenge, insert relay_read_tokens (10 min)
+    R-->>B: token
+    B->>R: GET messages, GET :mid (Bearer)
+    R-->>B: sealed box, opened only in the buyer's page
+    B->>R: DELETE :mid when handled
+```
+
+**DFD: what the relay stores**
+
+```mermaid
+flowchart LR
+    SND[Any sender<br/>page or node]:::human
+    OWN[Mailbox owner<br/>page or node]:::human
+    P1((1.0<br/>Register<br/>mailbox)):::sys
+    P2((2.0<br/>Prove<br/>ownership)):::seal
+    P3((3.0<br/>Accept<br/>message)):::sys
+    P4((4.0<br/>Serve<br/>messages)):::sys
+    P5((5.0<br/>Keep owner's<br/>state)):::sys
+    P6((6.0<br/>Expire<br/>old data)):::sys
+    D1[(relay_mailboxes<br/>pk, id)]:::store
+    D2[(relay_challenges<br/>eph key, nonce)]:::store
+    D3[(relay_read_tokens<br/>10 min)]:::store
+    D4[(relay_messages<br/>ciphertext, size, times)]:::store
+    D5[(relay_state<br/>one sealed blob)]:::store
+    OWN -- mailbox_pk, proof --> P1
+    P1 --> D1
+    OWN -- challenge request, proof --> P2
+    P2 <--> D2
+    P2 -- token --> D3
+    SND -- sealed box --> P3
+    D1 -- id check --> P3
+    P3 --> D4
+    OWN -- Bearer token --> P4
+    D3 -- valid? --> P4
+    D4 -- sealed boxes --> P4
+    P4 -- ciphertext --> OWN
+    OWN -- sealed state --> P5
+    P5 <--> D5
+    P6 -- delete after RETENTION_DAYS --> D4
+    P6 -- delete expired --> D2
+    P6 -- delete expired --> D3
+    classDef human fill:#FCFCFE,stroke:#7E2A53,color:#461D3A,stroke-width:2px
+    classDef zcash fill:#020D2F,stroke:#1D97F1,color:#C4C7F2,stroke-width:2px
+    classDef sys fill:#F6F5FC,stroke:#032C7D,color:#020D2F,stroke-width:2px
+    classDef seal fill:#7E2A53,stroke:#461D3A,color:#FCFCFE,stroke-width:2px
+    classDef store fill:#ECD0EC,stroke:#7E2A53,color:#461D3A,stroke-width:1px
+```
+<sub>DFD legend: rectangles are external entities, circles are processes, cylinders are data stores; arrows carry the named data.</sub>
+
 ## Protocol
 
 - `mailbox_id = BLAKE2b-512("JitsuinMailboxId_v1\n" ‖ mailbox_pk)[0..32]`, hex. The relay computes it from the key, so its id always matches the client's.
