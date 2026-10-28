@@ -1,8 +1,70 @@
-# jitsuinfi-backend
+<p align="center">
+  <a href="https://jitsuinfi.vercel.app"><img src=".github/readme/banner.svg" alt="JitsuinFi: Zcash stops double-spending. JitsuinFi stops double-financing." width="100%"></a>
+</p>
+
+<p align="center">
+  <img alt="Zcash testnet, Ironwood pool" src="https://img.shields.io/badge/Zcash-testnet%20%C2%B7%20Ironwood%20pool-032C7D?style=flat-square">
+  <img alt="ZECATHON 2026, Private Markets" src="https://img.shields.io/badge/ZECATHON%202026-Private%20Markets-7E2A53?style=flat-square">
+  <img alt="License MIT or Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-461D3A?style=flat-square">
+  <img alt="Node 22.18+" src="https://img.shields.io/badge/Node-22.18%2B-032C7D?style=flat-square&logo=nodedotjs&logoColor=white">
+  <img alt="Postgres" src="https://img.shields.io/badge/Postgres-Supabase-0841C9?style=flat-square&logo=postgresql&logoColor=white">
+</p>
+
+<p align="center">
+  <b>The relay: sealed mailboxes that carry deal documents between supplier, buyer and financier. It only ever holds ciphertext.</b>
+</p>
+
+<p align="center">
+  <a href="https://jitsuinfi.vercel.app"><b>Landing</b></a> ·
+  <a href="https://jitsuinfi.vercel.app/app"><b>App</b></a> ·
+  <a href="https://jitsuinfi.vercel.app/try"><b>Try to double-finance</b></a> ·
+  <a href="https://jitsuinfi.vercel.app/verify"><b>Verify</b></a> ·
+  <a href="https://jitsuinfi-console-demo.vercel.app/console"><b>Console demo</b></a> ·
+  <a href="https://youtu.be/RB9hKSLarJo"><b>2-min video</b></a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/RB9hKSLarJo"><img src=".github/readme/video-thumb.jpg" alt="Watch the 2-minute demo on YouTube" width="760"></a>
+  <br><sub>Two minutes: the idea, a double-financing attempt caught live on the testnet board, and a whole deal from supplier to settlement.</sub>
+</p>
 
 Relay for **JitsuinFi**: encrypted mailboxes that carry deal documents between supplier, buyer and financier (HNK-23). The relay stores only what it must: each mailbox's X25519 key and id, opaque sealed messages with their size and times, one-time challenges and short read tokens. It never sees a document, a key or an IP address in its tables.
 
 The browser reaches it as `/api/*` on the web app's own origin (Vercel rewrite, HNK-23.T6), so the app's CSP stays `connect-src 'self'`. The database is Supabase Postgres, reached only from this server (D-33).
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src=".github/readme/deal.webp" alt="What travels through the relay" width="100%"><br><b>What travels through the relay</b><br><sub>The supplier writes on a phone; the invoice lands sealed in the buyer's inbox; one passkey touch signs it and the signature travels back, all as ciphertext.</sub></td>
+    <td width="50%" valign="top"><img src=".github/readme/repeat.webp" alt="Inboxes on both sides" width="100%"><br><b>Inboxes on both sides</b><br><sub>Repeat invoices on production: the supplier's inbox says the buyer's key is free again, the buyer's shows the second deal settled.</sub></td>
+  </tr>
+</table>
+
+## What the relay can and cannot see
+
+| The relay **sees** | The relay **never sees** |
+|---|---|
+| each mailbox's public X25519 key and id | any document, invoice, amount or party |
+| sealed messages: size, received and expiry time | the message type, the sender, the fingerprint N |
+| one-time challenges, short read tokens | a key, a passkey or an IP address in its tables |
+| one sealed state blob per mailbox (multi-device sync) | what is inside it: AES-GCM under a passkey key, sealed to the owner |
+
+## Ownership proof and delivery
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Sender (any party)
+    participant R as Relay
+    participant O as Mailbox owner
+    O->>R: POST /api/mailbox/challenge {mailbox_pk, purpose}
+    R-->>O: one-time X25519 key e, nonce
+    O->>R: proof = BLAKE2b(X25519(secret, e), nonce, mailbox_pk)
+    R-->>O: mailbox registered / 10-min read token
+    A->>R: POST sealed box to /api/mailbox/:id/messages
+    Note over R: stores ciphertext, size, time.<br/>Never the content, type, sender or N.
+    O->>R: GET messages (Bearer token)
+    R-->>O: sealed boxes, opened only in the owner's browser or node
+```
 
 ## Protocol
 
@@ -43,6 +105,9 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 
 ## Deploy on Railway (HNK-23.T5, after approval)
 
+<details>
+<summary>Open the reference</summary>
+
 `railway.json` builds with Railpack on Node 24 (`.node-version`), runs `npm run migrate` before each deploy (idempotent), starts with `npm start` and checks `/api/health`. The relay also applies the same `db/*.sql` when it starts on Postgres and refuses to start if it cannot, so a deploy whose pre-deploy step did not run never serves an older schema (a missing table would otherwise answer 503).
 
 1. Railway: New project → Deploy from GitHub repo → `JitsuinFi/jitsuinfi-backend`, branch `main`.
@@ -54,6 +119,10 @@ npm start              # :8787; without DATABASE_URL it keeps everything in memo
 Session pooler, because the direct connection is IPv6 only and Railway connects over IPv4; port 5432 (session mode), because `postgres` uses prepared statements. The password is the database password (Project Settings → Database), not an API key. No Supabase API keys (anon, publishable, secret, service role) are used: the relay talks to Postgres only, and the browser never talks to Supabase (D-33).
 
 Status: in development for ZECATHON 2026, on Zcash testnet.
+
+</details>
+
+<p align="center"><img src=".github/readme/outro.webp" alt="Zcash stops double-spending. JitsuinFi stops double-financing." width="640"></p>
 
 ## License
 
